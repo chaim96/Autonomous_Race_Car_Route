@@ -131,6 +131,7 @@ class Graph:
         result = self.connect_vertexes(nearest_vertex, nearest_vertex_index, next_vertex)
         return result, random_sample, (next_vertex[0], next_vertex[1]), (nearest_vertex[0], nearest_vertex[1])
 
+
     #draw the path in red
     def get_path_to_goal(self):
         if self.success:
