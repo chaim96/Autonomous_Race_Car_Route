@@ -1,6 +1,36 @@
 import random
+import numpy as np
+import matplotlib.pyplot as plt 
 
+class Odom(object):
+    def __init__(self):
+        self.wheelbase = 0.35
+        self.x = 0
+        self.y = 0
+        self.theta = 0
 
+    #get v, delta and time and return list of random [x,y,theta] 
+    def random_control(self, velocity, steering, time):
+        theta_dot = velocity * np.tan(steering) / self.wheelbase
+        dt = 0.05
+        self.theta += self.theta * time
+        waypoints_x = []
+        waypoints_y = []
+        waypoints_theta = []
+        waypoints_x.append(self.x)
+        waypoints_y.append(self.y)
+        waypoints_theta.append(self.theta)
+        for _ in range(int(time/dt)):
+            self.theta += theta_dot * dt
+            x_dot = velocity * np.cos(self.theta)
+            y_dot = velocity * np.sin(self.theta)
+            self.x += x_dot * dt
+            self.y += y_dot * dt
+            waypoints_x.append(self.x)
+            waypoints_y.append(self.y)
+            waypoints_theta.append(self.theta)
+        return [waypoints_x, waypoints_y, waypoints_theta]
+    
 class Vertex:
     def __init__(self, x, y, theta, delta, v, cost, parent_index, ver_index):
         self.x = x
@@ -166,11 +196,29 @@ class Graph:
                 parent_index = vertex[2]
         return self.path
 
+    #get k nearest vertexes to the given vertex
+    def get_k_nearest(self, vertex):
+        k=2
+        k_nearest = []
+        k_distances = []
+        for v in self.vertexes:
+            if len(k_nearest)<k:
+                k_nearest.append(v)
+                k_distances.append(self.calc_distance_between_vertexes(vertex, v))
+            else:
+                max_index = k_distances.index(max(k_distances))
+                current_distance = self.calc_distance_between_vertexes(vertex, v)
+                if current_distance < k_distances[max_index]:
+                    k_nearest[max_index] = v
+                    k_distances[max_index] = current_distance
+        return k_nearest
+            
 
-    # loop for all existing vertexes and find the fastest path to new vertex from start point
+    # loop for k nearest vertexes and find the fastest path to new vertex from start point
     def wiring(self, new_vertex):
+        k_nearest = self.get_k_nearest(new_vertex)
         new_vertex_current_cost = 10000000 #big initial cost
-        for index, current_vertex in self.vertexes:
+        for index, current_vertex in k_nearest:
             #if new vertex is reachable from current vertex -> check if new vertex cost is better
             if self.is_reachable(current_vertex, new_vertex):
                 new_cost = self.calc_cost(current_vertex, new_vertex)
@@ -181,9 +229,10 @@ class Graph:
         return
 
 
-    # loop for all existing vertexes and for each existing vertex we will ask if the new vertex improves the path to existing vertex from start point
+    # loop for k nearest vertexes, for each one ask if the new vertex improves the path to existing vertex from start point
     def rewiring(self, new_vertex):
-        for index, current_vertex in self.vertexes:
+        k_nearest = self.get_k_nearest(new_vertex)
+        for current_vertex in k_nearest:
             # if current vertex is reachable from new vertex -> check if current vertex cost is better
             if self.is_reachable(new_vertex, current_vertex):
                 new_cost = self.calc_cost(new_vertex, current_vertex)
@@ -194,9 +243,37 @@ class Graph:
         return
 
 
+def gui():
+    odom = Odom()
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    odom = Odom()
+    iterations = 10
+    for i in range(0, iterations):
+
+        velocity = np.random.uniform(2.0)
+        steering = np.random.uniform(-np.pi/6, np.pi/6)
+        time = np.random.uniform(0.5,2)
+        #print(f'velocity {velocity}, steering {steering}, time {time}')
+        waypoints = odom.random_control(velocity=velocity, steering=steering, time=time)
+        ax.scatter(waypoints[0], waypoints[1])
+        print("__________________")
+        print(waypoints)
+        print("__________________")
+
+        ax.set_aspect('equal', 'box')
+    waypoints = [5,5,5]
+    ax.set_aspect('equal', 'box')
+    plt.show()
+
+if __name__ == "__main__":
+    gui()
+    print("GOOD")
+
+
 #TODO: where wiring and rewiring should be called from?
     #I think from expand_graph function
-        '''
+'''
         # Algorithm:
         1. choose random vertex to be the parent.
         2. choose random delta, v, t.
@@ -213,4 +290,4 @@ class Graph:
         # Future notes:
         1. by given point to check if new vertex is within track boundaries.
         2. what if there are a few good paths to the end point
-        '''
+'''
