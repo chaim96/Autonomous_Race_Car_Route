@@ -1,4 +1,3 @@
-import pygame.display
 import math
 import random
 

@@ -44,7 +44,7 @@ class Vertex:
 
 
 class Graph:
-    def __init__(self, start, end, obstacles, v_change_range, delta_change_range, max_delta_per_v, t_max, bias_ratio):
+    def __init__(self, start, end, obstacles, v_change_range, v_max, delta_change_range, max_delta_per_v, t_max, bias_ratio):
         # graph attributes
         self.start = start
         self.end = end
@@ -53,6 +53,7 @@ class Graph:
         self.path = []
         self.end_radius = 15
         self.v_change_range = v_change_range # a new v will be within [v_current - v_change_range, v_current + v_change_range]
+        self.v_max = v_max
         self.delta_change_range = delta_change_range # a new delta will be within [delta_current - delta_change_range, delta_current + delta_change_range]
         self.max_delta_per_v = max_delta_per_v # an array which contains the max delta possible for a given v
         self.t_max = t_max # max time to new vertex
@@ -77,18 +78,15 @@ class Graph:
     def choose_random_parameters(self, vertex):
         valid_delta_for_v = False
         while not valid_delta_for_v:
-            v = random.randint(vertex.v - self.v_change_range, vertex.v + self.v_change_range)
+            v = random.randint(max(vertex.v - self.v_change_range, 0), min(vertex.v + self.v_change_range, self.v_max))
             # check if the lower limit of the random delta range is smaller\equal to the max delta allowed by v
             # if not, choose a new v
             if (vertex.delta - self.delta_change_range) <= self.max_delta_per_v[v]:
                 valid_delta_for_v = True
-                # check if the higher limit of the random delta range is smaller\equal to the max delta allowed by v
-                if(vertex.delta + self.delta_change_range) <= self.max_delta_per_v[v]:
-                    delta = random.randint(vertex.delta - self.delta_change_range, vertex.delta + self.delta_change_range)
-                # if not, make the max delta the higher limit of the range
-                else:
-                    delta = random.randint(vertex.delta - self.delta_change_range, self.max_delta_per_v[v])
-        t = random.randint(0, self.t_max)
+                # choose the higher limit of the random delta range to be the min of max delta allowed by v or the change range limit
+                delta = random.uniform(max(0, vertex.delta - self.delta_change_range), min(vertex.delta + self.delta_change_range, self.max_delta_per_v[v]))
+        #t = random.randint(0, self.t_max)
+        t = 1
         return delta, v, t
 
 
@@ -243,23 +241,36 @@ class Graph:
         return
 
 
-def gui():
-    odom = Odom()
+def main_loop():
     fig = plt.figure()
     ax = fig.add_subplot()
     odom = Odom()
+    max_delta_per_v = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+    start = Vertex(0, 0, 0, 0, 0, 0, 0, 0)
+    end = Vertex(2, 2, 0, 0, 0, 0, 0, 0)
+    graph = Graph(start, end, 0, 1, 2, 0.05, max_delta_per_v, 1, 10)
     iterations = 10
+    vertex = Vertex(odom.x, odom.y, odom.theta, 0, 0, 0, 0, 0)
     for i in range(0, iterations):
 
+        steering, velocity, time = graph.choose_random_parameters(vertex)
+        steering = 0.05
+        """
         velocity = np.random.uniform(2.0)
         steering = np.random.uniform(-np.pi/6, np.pi/6)
         time = np.random.uniform(0.5,2)
+        """
         #print(f'velocity {velocity}, steering {steering}, time {time}')
         waypoints = odom.random_control(velocity=velocity, steering=steering, time=time)
         ax.scatter(waypoints[0], waypoints[1])
         print("__________________")
         print(waypoints)
+        print(steering)
         print("__________________")
+        new_vertex = Vertex(waypoints[0][-1], waypoints[1][-1], waypoints[2][-1], steering, velocity, time+vertex.cost, vertex.ver_index, graph.get_num_of_vertexes()+1)
+        graph.add_vertex(new_vertex)
+        # vertex = graph.choose_random_existing_vertex()
+        vertex = new_vertex
 
         ax.set_aspect('equal', 'box')
     waypoints = [5,5,5]
@@ -267,8 +278,7 @@ def gui():
     plt.show()
 
 if __name__ == "__main__":
-    gui()
-    print("GOOD")
+    main_loop()
 
 
 #TODO: where wiring and rewiring should be called from?

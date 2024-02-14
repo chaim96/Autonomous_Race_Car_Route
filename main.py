@@ -1,10 +1,10 @@
 import time
 
-import pygame
 from RRT import Graph
 from Map import Map
+import RRT_Star
 
-
+""""
 def main():
     # setting initial numbers
     map_dimensions = (600, 1000)
@@ -47,7 +47,8 @@ def main():
     pygame.display.update()
     pygame.event.clear()
     pygame.event.wait(0)
+"""
 
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+
