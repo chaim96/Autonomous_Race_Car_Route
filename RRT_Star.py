@@ -1,6 +1,8 @@
+import math
 import random
 import numpy as np
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
+
 
 class Odom(object):
     def __init__(self):
@@ -9,18 +11,20 @@ class Odom(object):
         self.y = 0
         self.theta = 0
 
-    #get v, delta and time and return list of random [x,y,theta] 
-    def random_control(self, velocity, steering, time):
+    def random_control(self, vertex, velocity, steering, time):
         theta_dot = velocity * np.tan(steering) / self.wheelbase
-        dt = 0.05
-        self.theta += self.theta * time
+        dt = 0.03
+        # print(theta_dot * time)
         waypoints_x = []
         waypoints_y = []
         waypoints_theta = []
-        waypoints_x.append(self.x)
-        waypoints_y.append(self.y)
-        waypoints_theta.append(self.theta)
-        for _ in range(int(time/dt)):
+        self.x = vertex.x
+        self.y = vertex.y
+        self.theta = vertex.theta
+        waypoints_x.append(vertex.x)
+        waypoints_y.append(vertex.y)
+        waypoints_theta.append(vertex.theta)
+        for _ in range(int(time / dt)):
             self.theta += theta_dot * dt
             x_dot = velocity * np.cos(self.theta)
             y_dot = velocity * np.sin(self.theta)
@@ -29,8 +33,12 @@ class Odom(object):
             waypoints_x.append(self.x)
             waypoints_y.append(self.y)
             waypoints_theta.append(self.theta)
+        # self.x = waypoints_x[-1]
+        # self.y = waypoints_y[-1]
+        # self.theta = waypoints_theta[-1]
         return [waypoints_x, waypoints_y, waypoints_theta]
-    
+
+
 class Vertex:
     def __init__(self, x, y, theta, delta, v, cost, parent_index, ver_index):
         self.x = x
@@ -44,56 +52,54 @@ class Vertex:
 
 
 class Graph:
-    def __init__(self, start, end, obstacles, v_change_range, v_max, delta_change_range, max_delta_per_v, t_max, bias_ratio):
+    def __init__(self, start, end, obstacles, v_change_range, delta_change_range, max_delta_per_v, t_max, bias_ratio):
         # graph attributes
         self.start = start
         self.end = end
-        self.success = False #if success we have a path between start and end points
-        self.vertexes = [start] # start that is passed as an argument must be a Vertex class object
+        self.success = False  # if success we have a path between start and end points
+        self.vertexes = [start]  # start that is passed as an argument must be a Vertex class object
         self.path = []
-        self.end_radius = 15
-        self.v_change_range = v_change_range # a new v will be within [v_current - v_change_range, v_current + v_change_range]
-        self.v_max = v_max
-        self.delta_change_range = delta_change_range # a new delta will be within [delta_current - delta_change_range, delta_current + delta_change_range]
-        self.max_delta_per_v = max_delta_per_v # an array which contains the max delta possible for a given v
-        self.t_max = t_max # max time to new vertex
-        self.bias_ratio = bias_ratio # sets how often we expand by bias
-
+        self.end_radius = 0.5
+        self.v_change_range = v_change_range  # a new v will be within [v_current - v_change_range, v_current + v_change_range]
+        self.delta_change_range = delta_change_range  # a new delta will be within [delta_current - delta_change_range, delta_current + delta_change_range]
+        self.max_delta_per_v = max_delta_per_v  # an array which contains the max delta possible for a given v
+        self.t_max = t_max  # max time to new vertex
+        self.bias_ratio = bias_ratio  # sets how often we expand by bias
 
     # adds new vertex
     def add_vertex(self, vertex):
         vertex.ver_index = len(self.vertexes)
         self.vertexes.append(vertex)
 
-
     # chooses random vertex to be the parent
     # returns the object of the chosen vertex
     def choose_random_existing_vertex(self):
         num_of_vertexes = len(self.vertexes)
-        random_vertex_index = random.randint(0, num_of_vertexes-1)
+        random_vertex_index = random.randint(0, num_of_vertexes - 1)
         return self.vertexes[random_vertex_index]
-
 
     # chooses random delta, v, t and return them
     def choose_random_parameters(self, vertex):
         valid_delta_for_v = False
         while not valid_delta_for_v:
-            v = random.randint(max(vertex.v - self.v_change_range, 0), min(vertex.v + self.v_change_range, self.v_max))
+            v = random.randint(max(1, vertex.v - self.v_change_range), vertex.v + self.v_change_range)
             # check if the lower limit of the random delta range is smaller\equal to the max delta allowed by v
             # if not, choose a new v
             if (vertex.delta - self.delta_change_range) <= self.max_delta_per_v[v]:
                 valid_delta_for_v = True
-                # choose the higher limit of the random delta range to be the min of max delta allowed by v or the change range limit
-                delta = random.uniform(max(0, vertex.delta - self.delta_change_range), min(vertex.delta + self.delta_change_range, self.max_delta_per_v[v]))
-        #t = random.randint(0, self.t_max)
-        t = 1
+                # check if the higher limit of the random delta range is smaller\equal to the max delta allowed by v
+                if (vertex.delta + self.delta_change_range) <= self.max_delta_per_v[v]:
+                    delta = random.uniform(vertex.delta - self.delta_change_range,
+                                           vertex.delta + self.delta_change_range)
+                # if not, make the max delta the higher limit of the range
+                else:
+                    delta = random.uniform(vertex.delta - self.delta_change_range, self.max_delta_per_v[v])
+        t = random.randint(1, self.t_max)
         return delta, v, t
-
 
     # returns number of vertexes in the graph
     def get_num_of_vertexes(self):
         return len(self.vertexes)
-
 
     # calculates if new vertex is in end radius
     # returns True is yes
@@ -105,14 +111,12 @@ class Graph:
             return True
         return False
 
-
     # returns distance of vertex to end vertex
     def calc_distance_to_end(self, vertex):
         px = (float(vertex.x) - float(self.end.x)) ** 2
         py = (float(vertex.y) - float(self.end.y)) ** 2
         distance = (px + py) ** (0.5)
         return distance
-
 
     # returns distance between 2 vertexes
     def calc_distance_between_vertexes(self, vertex1, vertex2):
@@ -121,51 +125,40 @@ class Graph:
         distance = (px + py) ** (0.5)
         return distance
 
-
     # finds vertex nearest to end vertex and returns it (for bias expanding)
     def find_nearest_vertex_to_end(self):
-        min_distance = self.calc_distance(self.vertexes[0])
-        nearest_vertex_to_end = self.vertexes[0]
+        min_distance = self.calc_distance_to_end(self.start)
+        nearest_vertex_to_end = self.start
         for vertex in self.vertexes:
-            distance = self.calc_distance(vertex)
+            distance = self.calc_distance_to_end(vertex)
             if distance < min_distance:
                 min_distance = distance
                 nearest_vertex_to_end = vertex
         return nearest_vertex_to_end
 
-
     # calculates cost of target if its parent is source
     def calc_cost(self, source, terget):
-        #new_cost = source_cost + delta time between them
+        # new_cost = source_cost + delta time between them
         # TODO: ori should give us
         return 1
-
-
-    # by given delta, v and t the function returns new point (x,y,theta)
-    def control_command(self, vertex, delta, t, v):
-        # TODO: ori should give us
-        return
-
 
     # checks if vertex is within track boundaries
     def is_in_track(self, x, y):
         # TODO: add later on, check if new vertex is within track boundaries
         return True
 
-
-    #checks if it is possible to go from current vertex to target vertex
+    # checks if it is possible to go from current vertex to target vertex
     def is_reachable(self, current_vertex, target_vertex):
-        #TODO: show Chaim
-        #TODO: ori should give us?
+        # TODO: show Chaim
+        # TODO: ori should give us?
         return True
-
-
+    """""
     # creates a new vertex in graph
     def expand_graph(self):
         # choose an existing vertex to expand from
-        if random.random(0, 1) <= self.bias_ratio: # bias expanding
+        if random.random(0, 1) <= self.bias_ratio:  # bias expanding
             parent_of_next_vertex = self.find_nearest_vertex_to_end(self.end)
-        else: # random expanding
+        else:  # random expanding
             parent_of_next_vertex = self.choose_random_existing_vertex()
         # keep getting a new vertex to expand to, and stop when it's within the track boundaries
         first_iteration = True
@@ -174,12 +167,13 @@ class Graph:
             x, y, theta = self.control_command(parent_of_next_vertex, delta, v, t)
             first_iteration = False
         # create the new vertex object and add it to the vertexes list
-        next_vertex = Vertex(x, y, theta, delta, v, parent_of_next_vertex.cost + t, self.vertexes.index(parent_of_next_vertex))
+        next_vertex = Vertex(x, y, theta, delta, v, parent_of_next_vertex.cost + t,
+                             self.vertexes.index(parent_of_next_vertex))
         self.add_vertex(next_vertex)
         # check if we got to the end vertex
         if self.is_in_end_radius(next_vertex):
             self.success = True
-
+    """""
 
     # draws the path in red
     def get_path_to_goal(self):
@@ -194,13 +188,13 @@ class Graph:
                 parent_index = vertex[2]
         return self.path
 
-    #get k nearest vertexes to the given vertex
+    # get k nearest vertexes to the given vertex
     def get_k_nearest(self, vertex):
-        k=2
+        k = 2
         k_nearest = []
         k_distances = []
         for v in self.vertexes:
-            if len(k_nearest)<k:
+            if len(k_nearest) < k:
                 k_nearest.append(v)
                 k_distances.append(self.calc_distance_between_vertexes(vertex, v))
             else:
@@ -210,22 +204,20 @@ class Graph:
                     k_nearest[max_index] = v
                     k_distances[max_index] = current_distance
         return k_nearest
-            
 
     # loop for k nearest vertexes and find the fastest path to new vertex from start point
     def wiring(self, new_vertex):
         k_nearest = self.get_k_nearest(new_vertex)
-        new_vertex_current_cost = 10000000 #big initial cost
+        new_vertex_current_cost = 10000000  # big initial cost
         for index, current_vertex in k_nearest:
-            #if new vertex is reachable from current vertex -> check if new vertex cost is better
+            # if new vertex is reachable from current vertex -> check if new vertex cost is better
             if self.is_reachable(current_vertex, new_vertex):
                 new_cost = self.calc_cost(current_vertex, new_vertex)
                 if new_cost < new_vertex_current_cost:
-                    #current vertex will be the parent of new vertex in the tree
+                    # current vertex will be the parent of new vertex in the tree
                     new_vertex_current_cost = new_cost
                     new_vertex.parent_index = index
         return
-
 
     # loop for k nearest vertexes, for each one ask if the new vertex improves the path to existing vertex from start point
     def rewiring(self, new_vertex):
@@ -241,48 +233,65 @@ class Graph:
         return
 
 
-def main_loop():
+def gui():
+    # initialize objects and main variables
     fig = plt.figure()
     ax = fig.add_subplot()
     odom = Odom()
     max_delta_per_v = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
     start = Vertex(0, 0, 0, 0, 0, 0, 0, 0)
+    ax.annotate("start", (start.x, start.y))
     end = Vertex(2, 2, 0, 0, 0, 0, 0, 0)
-    graph = Graph(start, end, 0, 1, 2, 0.05, max_delta_per_v, 1, 10)
-    iterations = 10
+    ax.annotate("end", (end.x, end.y))
+    graph = Graph(start, end, 0, 1, 1, max_delta_per_v, 1, 0.5)
+    iterations = 50
     vertex = Vertex(odom.x, odom.y, odom.theta, 0, 0, 0, 0, 0)
+
+    # main loop for expansion
     for i in range(0, iterations):
 
+        # get parameters: random steering, velocity and time
         steering, velocity, time = graph.choose_random_parameters(vertex)
-        steering = 0.05
-        """
-        velocity = np.random.uniform(2.0)
-        steering = np.random.uniform(-np.pi/6, np.pi/6)
-        time = np.random.uniform(0.5,2)
-        """
-        #print(f'velocity {velocity}, steering {steering}, time {time}')
-        waypoints = odom.random_control(velocity=velocity, steering=steering, time=time)
-        ax.scatter(waypoints[0], waypoints[1])
-        print("__________________")
-        print(waypoints)
-        print(steering)
-        print("__________________")
-        new_vertex = Vertex(waypoints[0][-1], waypoints[1][-1], waypoints[2][-1], steering, velocity, time+vertex.cost, vertex.ver_index, graph.get_num_of_vertexes()+1)
-        graph.add_vertex(new_vertex)
-        # vertex = graph.choose_random_existing_vertex()
-        vertex = new_vertex
+        print(f'iteration {i + 1}, velocity {velocity}, steering {steering * 180 / math.pi}, time {time}, start vertex {vertex.parent_index+1}')
 
-        ax.set_aspect('equal', 'box')
-    waypoints = [5,5,5]
+        # calculate new vertex from parameters and show it and its edge
+        waypoints = odom.random_control(vertex, velocity, steering, time)
+        new_vertex = Vertex(waypoints[0][-1], waypoints[1][-1], waypoints[2][-1], steering, velocity,
+                            time + vertex.cost, vertex.ver_index, graph.get_num_of_vertexes() + 1)
+
+        # wiring operation
+        graph.wiring(new_vertex)
+
+        # plot new edge between vertexes
+        ax.scatter(waypoints[0], waypoints[1])
+        ax.annotate(str(i + 1), (waypoints[0][-1], waypoints[1][-1]))
+
+        # check if we got to the end vertex
+        if graph.is_in_end_radius(new_vertex):
+            graph.success = True
+            print("HAYDEH")
+
+        # add new vertex to graph
+        graph.add_vertex(new_vertex)
+
+        # choose the next vertex
+        if random.random() <= graph.bias_ratio:  # bias expanding
+            vertex = graph.find_nearest_vertex_to_end()
+            print("next is bias:")
+        else:  # random expanding
+            vertex = graph.choose_random_existing_vertex()
+            print("next is random:")
+
     ax.set_aspect('equal', 'box')
     plt.show()
 
+
 if __name__ == "__main__":
-    main_loop()
+    gui()
+    print("GOOD")
 
-
-#TODO: where wiring and rewiring should be called from?
-    #I think from expand_graph function
+# TODO: where wiring and rewiring should be called from?
+# I think from expand_graph function
 '''
         # Algorithm:
         1. choose random vertex to be the parent.
