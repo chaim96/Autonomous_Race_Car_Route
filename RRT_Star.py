@@ -2,6 +2,8 @@ import math
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+from dubins_path_planner import *
+import Map
 
 
 class Odom(object):
@@ -40,7 +42,7 @@ class Odom(object):
 
 
 class Vertex:
-    def __init__(self, x, y, theta, delta, v, cost, parent_index, ver_index):
+    def __init__(self, x, y, theta, delta, v, cost, parent_index, ver_index, edge_way_points=None, scatter_temp=None):
         self.x = x
         self.y = y
         self.theta = theta
@@ -49,6 +51,8 @@ class Vertex:
         self.cost = cost
         self.parent_index = parent_index
         self.ver_index = ver_index
+        self.edge_way_points = edge_way_points  # this is the edge that connect vertex to start point
+        self.scatter_temp = scatter_temp
 
 
 class Graph:
@@ -59,7 +63,7 @@ class Graph:
         self.success = False  # if success we have a path between start and end points
         self.vertexes = [start]  # start that is passed as an argument must be a Vertex class object
         self.path = []
-        self.end_radius = 0.5
+        self.end_radius = 1
         self.v_change_range = v_change_range  # a new v will be within [v_current - v_change_range, v_current + v_change_range]
         self.delta_change_range = delta_change_range  # a new delta will be within [delta_current - delta_change_range, delta_current + delta_change_range]
         self.max_delta_per_v = max_delta_per_v  # an array which contains the max delta possible for a given v
@@ -137,8 +141,18 @@ class Graph:
         return nearest_vertex_to_end
 
     # calculates cost of target if its parent is source
-    def calc_cost(self, source, terget):
+    def calc_cost(self, source_vertex, terget_vertex):
         # new_cost = source_cost + delta time between them
+        # self.calc_cost(current_vertex, new_vertex)
+        path_x, path_y, path_yaw, mode, lengths = plan_dubins_path(source_vertex.x, source_vertex.y,
+                                                                   source_vertex.theta, terget_vertex.x,
+                                                                   terget_vertex.y, terget_vertex.theta, 1.0)
+        v = source_vertex.v
+        x = sum(lengths)
+        t = x / max(1, v)
+        target_cost = source_vertex.cost + t
+        return path_x, path_y, target_cost
+
         # TODO: ori should give us
         return 1
 
@@ -149,9 +163,11 @@ class Graph:
 
     # checks if it is possible to go from current vertex to target vertex
     def is_reachable(self, current_vertex, target_vertex):
-        # TODO: show Chaim
-        # TODO: ori should give us?
+        for i in range(waypoints[0].length):
+            if race_track.inflated_map[waypoints[0][i], waypoints[1][i]].all():
+                return False  # TODO: Chaim - must go over
         return True
+
     """""
     # creates a new vertex in graph
     def expand_graph(self):
@@ -206,35 +222,86 @@ class Graph:
         return k_nearest
 
     # loop for k nearest vertexes and find the fastest path to new vertex from start point
-    def wiring(self, new_vertex):
+    def wiring(self, new_vertex, ax):
         k_nearest = self.get_k_nearest(new_vertex)
-        new_vertex_current_cost = 10000000  # big initial cost
-        for index, current_vertex in k_nearest:
+        for index, current_vertex in enumerate(k_nearest):
             # if new vertex is reachable from current vertex -> check if new vertex cost is better
             if self.is_reachable(current_vertex, new_vertex):
-                new_cost = self.calc_cost(current_vertex, new_vertex)
-                if new_cost < new_vertex_current_cost:
+                path_x, path_y, new_cost = self.calc_cost(current_vertex, new_vertex)
+                # print("-------new_cost: " + str(new_cost))
+                # print("-------current_cost: " + str(new_vertex.cost))
+                if new_cost < new_vertex.cost:
                     # current vertex will be the parent of new vertex in the tree
-                    new_vertex_current_cost = new_cost
+                    new_vertex.cost = new_cost
                     new_vertex.parent_index = index
+                    new_vertex.edge_way_points[0] = path_x
+                    new_vertex.edge_way_points[1] = path_y
+                    print("########did wiring thing########")
+                    new_vertex.scatter_temp.remove()
+                    new_vertex.scatter_temp = draw_edge2(path_x, path_y, ax)
         return
 
     # loop for k nearest vertexes, for each one ask if the new vertex improves the path to existing vertex from start point
-    def rewiring(self, new_vertex):
+    def rewiring(self, new_vertex, ax):
         k_nearest = self.get_k_nearest(new_vertex)
         for current_vertex in k_nearest:
             # if current vertex is reachable from new vertex -> check if current vertex cost is better
             if self.is_reachable(new_vertex, current_vertex):
-                new_cost = self.calc_cost(new_vertex, current_vertex)
+                path_x, path_y, new_cost = self.calc_cost(new_vertex, current_vertex)
                 if new_cost < current_vertex.cost:
                     # new vertex will be the parent of current vertex in the tree
                     current_vertex.cost = new_cost
-                    current_vertex.parent_index = new_vertex.index
+                    current_vertex.parent_index = new_vertex.ver_index
+                    current_vertex.edge_way_points[0] = path_x
+                    current_vertex.edge_way_points[1] = path_y
+                    print("^^^^^^^^ did RE-wiring thing ^^^^^^^^")
+                    current_vertex.scatter_temp.remove()
+                    current_vertex.scatter_temp = draw_edge2(path_x, path_y, ax)
         return
+
+    def draw_winning_path(self, start, new_vertex, ax):
+        import pdb;
+        pdb.set_trace()
+        cur_vertex = new_vertex
+        while (cur_vertex is not start):
+            print("x: " + str(cur_vertex.x) + "y: " + str(cur_vertex.y))
+            ax.scatter(cur_vertex.edge_way_points[0], cur_vertex.edge_way_points[1], marker='o', edgecolors='green',
+                       s=100)
+            cur_vertex = self.vertexes[cur_vertex.parent_index]
+        return
+
+
+def draw_edge(source_vertex, terget_vertex):
+    path_x, path_y, path_yaw, mode, lengths = plan_dubins_path(source_vertex.x, source_vertex.y, source_vertex.theta,
+                                                               terget_vertex.x, terget_vertex.y, terget_vertex.theta,
+                                                               1.0)
+    plt.plot(path_x, path_y, label="".join(mode))
+    plot_arrow(float(source_vertex.x), float(source_vertex.y), float(source_vertex.theta))
+    plot_arrow(float(terget_vertex.x), float(terget_vertex.y), float(terget_vertex.theta))
+    plt.legend()
+    plt.grid(True)
+    plt.axis("equal")
+    plt.pause(0.05)
+
+
+def remove_edge(temp):
+    temp.remove()
+
+
+def draw_edge2(waypointX, waypointY, ax, i=0):
+    # plot new edge between vertexes
+    temp = ax.scatter(waypointX, waypointY, marker='o', edgecolors='red', s=10)
+    ax.annotate(str(i + 1), (waypointX[-1], waypointY[-1]))
+    plt.pause(0.05)
+    # import pdb;pdb.set_trace()
+    return temp
 
 
 def gui():
     # initialize objects and main variables
+    race_track_map = np.array(np.load('smaller_circle.npy'), dtype=int)
+    race_track = Map_Class.Map(race_track_map, 1)
+
     fig = plt.figure()
     ax = fig.add_subplot()
     odom = Odom()
@@ -244,7 +311,7 @@ def gui():
     end = Vertex(2, 2, 0, 0, 0, 0, 0, 0)
     ax.annotate("end", (end.x, end.y))
     graph = Graph(start, end, 0, 1, 1, max_delta_per_v, 1, 0.5)
-    iterations = 50
+    iterations = 20
     vertex = Vertex(odom.x, odom.y, odom.theta, 0, 0, 0, 0, 0)
 
     # main loop for expansion
@@ -252,24 +319,30 @@ def gui():
 
         # get parameters: random steering, velocity and time
         steering, velocity, time = graph.choose_random_parameters(vertex)
-        print(f'iteration {i + 1}, velocity {velocity}, steering {steering * 180 / math.pi}, time {time}, start vertex {vertex.parent_index+1}')
+        print(
+            f'iteration {i + 1}, velocity {velocity}, steering {steering * 180 / math.pi}, time {time}, start vertex {vertex.parent_index + 1}')
 
         # calculate new vertex from parameters and show it and its edge
-        waypoints = odom.random_control(vertex, velocity, steering, time)
+        waypoints = odom.random_control(vertex, velocity, steering, time)  # waypoints = [[Xs],[Ys],[thetas]]
         new_vertex = Vertex(waypoints[0][-1], waypoints[1][-1], waypoints[2][-1], steering, velocity,
-                            time + vertex.cost, vertex.ver_index, graph.get_num_of_vertexes() + 1)
+                            time + vertex.cost, vertex.ver_index, graph.get_num_of_vertexes() + 1, waypoints)
+
+        # draw_edge(vertex, new_vertex)
+        new_vertex.scatter_temp = draw_edge2(new_vertex.edge_way_points[0], new_vertex.edge_way_points[1], ax, i)
 
         # wiring operation
-        graph.wiring(new_vertex)
+        graph.wiring(new_vertex, ax)
+        # rewiring operation
+        graph.rewiring(new_vertex, ax)
 
-        # plot new edge between vertexes
-        ax.scatter(waypoints[0], waypoints[1])
-        ax.annotate(str(i + 1), (waypoints[0][-1], waypoints[1][-1]))
+        # ax.scatter(waypoints[0], waypoints[1],marker='none')
 
         # check if we got to the end vertex
         if graph.is_in_end_radius(new_vertex):
             graph.success = True
-            print("HAYDEH")
+            print("---------------------------------------------HAYDEH------------------------------------------")
+            graph.draw_winning_path(start, new_vertex, ax)
+            break
 
         # add new vertex to graph
         graph.add_vertex(new_vertex)
@@ -288,7 +361,7 @@ def gui():
 
 if __name__ == "__main__":
     gui()
-    print("GOOD")
+    print("FINISH")
 
 # TODO: where wiring and rewiring should be called from?
 # I think from expand_graph function
