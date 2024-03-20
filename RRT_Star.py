@@ -300,7 +300,7 @@ def draw_edge2(waypointX, waypointY, ax, i=0):
 def gui():
     # initialize objects and main variables
     race_track_map = np.array(np.load('smaller_circle.npy'), dtype=int)
-    race_track = Map_Class.Map(race_track_map, 1)
+    race_track = Map_Class(race_track_map, 1)
 
     fig = plt.figure()
     ax = fig.add_subplot()

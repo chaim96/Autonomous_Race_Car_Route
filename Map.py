@@ -8,7 +8,7 @@ img = cv2.imread(os.path.join("C:\\Users\\990sh\\Desktop", "Picture4.png"))
 np.save('smaller_circle.npy', img)
 
 
-class Map:
+class Map_Class:
     def __init__(self, map_: np.array, inflation=0):
         self.map = map_
         self.inflation = inflation
