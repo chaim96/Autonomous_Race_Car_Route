@@ -55,7 +55,7 @@ class Graph:
         self.success = False  # if success we have a path between start and end points
         self.vertexes = [start]  # start that is passed as an argument must be a Vertex class object
         self.path = []
-        self.end_radius = 5
+        self.end_radius = 1
         self.v_change_range = v_change_range  # a new v will be within [v_current - v_change_range, v_current + v_change_range]
         self.delta_change_range = delta_change_range  # a new delta will be within [delta_current - delta_change_range, delta_current + delta_change_range]
         self.max_delta_per_v = max_delta_per_v  # an array which contains the max delta possible for a given v
@@ -79,7 +79,7 @@ class Graph:
         v = random.randint(max(1, vertex.v - self.v_change_range), vertex.v + self.v_change_range)
         delta_options_list = [0.1, -0.1, 0.2, -0.2, 0.3, -0.3]
         delta = random.choice(delta_options_list)
-        t = random.randint(5, self.t_max)
+        t = random.randint(1, self.t_max)
         return delta, v, t
 
     # returns number of vertexes in the graph
@@ -174,7 +174,7 @@ class Graph:
         k_nearest = self.get_k_nearest(new_vertex)
         for index, current_vertex in enumerate(k_nearest):
             # if new vertex is reachable from current vertex -> check if new vertex cost is better
-            path_x, path_y, new_cost = self.calc_cost(current_vertex, new_vertex);
+            path_x, path_y, new_cost = self.calc_cost(current_vertex, new_vertex)
             if self.is_reachable(path_x, path_y, map_with_obstacles):
                 if new_cost < new_vertex.cost:
                     # current vertex will be the parent of new vertex in the tree
@@ -213,7 +213,7 @@ class Graph:
 
 def draw_edge2(waypointX, waypointY, i=0):
     # plot new edge between vertexes
-    temp = plt.scatter(waypointX, waypointY, marker='o', edgecolors='red', s=1)
+    temp = plt.scatter(waypointX, waypointY, marker='o', edgecolors='red', s=0.1)
     plt.pause(0.05)
     return temp
 
@@ -222,7 +222,7 @@ def main():
 
     # initialize plot items
     plt.ion()
-    plt.figure()
+    fig = plt.figure()
 
     # initialize and display map
     map_with_obstacles = Track_Map.create_map()
@@ -231,12 +231,12 @@ def main():
     # initialize and display graph items
     odom = Odom()
     max_delta_per_v = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-    start = Vertex(0, 0, 0, 0, 0, 0, 0, 0)
+    start = Vertex(1, 1, 0, 0, 0, 0, 0, 0)
     plt.annotate("start", (start.x, start.y))
-    end = Vertex(5, 5, 0, 0, 0, 0, 0, 0)
+    end = Vertex(8, 3, 0, 0, 0, 0, 0, 0)
     plt.annotate("end", (end.x, end.y))
-    graph = Graph(start, end, 0, 1, 1, max_delta_per_v, 10, 0.5)
-    vertex = Vertex(odom.x, odom.y, odom.theta, 0, 0, 0, 0, 0)
+    graph = Graph(start, end, 0, 1, 1, max_delta_per_v, 10, 0)
+    vertex = start
 
     # main loop for expansion
     iterations = 100
@@ -244,6 +244,7 @@ def main():
 
         # calculate next reachable vertex
         collide = True
+        calc_from_same_vertex = 0
         while collide:
             # get parameters: random steering, velocity and time
             steering, velocity, time = graph.choose_random_parameters(vertex)
@@ -254,6 +255,10 @@ def main():
             if graph.is_reachable(waypoints[0], waypoints[1], map_with_obstacles):
                 collide = False
             else:
+                calc_from_same_vertex = calc_from_same_vertex + 1
+                if calc_from_same_vertex > 3:
+                    vertex = graph.choose_random_existing_vertex()
+                    calc_from_same_vertex = 0
                 print("COLLISION")
 
         # create next new vertex and draw it's edge
@@ -285,16 +290,12 @@ def main():
             vertex = graph.choose_random_existing_vertex()
             print("next is random:")
 
-        plt.show()
-
-    plt.draw()
-    plt.pause(0.02)
+    plt.ioff()
     plt.show()
 
 
 if __name__ == "__main__":
     main()
-    plt.show()
     print("FINISH")
 
 
