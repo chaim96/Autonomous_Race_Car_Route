@@ -1,29 +1,34 @@
-import os
-import cv2
-import numpy as np
+import matplotlib.pyplot as plt
 
+class MapWithObstacles:
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+        self.grid = [[0] * width for _ in range(height)]  # Initialize grid with all zeros
 
-# code to convert jpeg or png image to npy:
-img = cv2.imread(os.path.join("C:\\Users\\990sh\\Desktop", "Picture4.png"))
-np.save('smaller_circle.npy', img)
+    def add_obstacle(self, x, y):
+        if 0 <= x < self.width and 0 <= y < self.height:
+            self.grid[y][x] = 1  # Set obstacle at position (x, y)
+            self._mark_adjacent_obstacles(x, y)
 
+    def is_obstacle(self, x, y):
+        if 0 <= x < self.width and 0 <= y < self.height:
+            return self.grid[y][x] == 1
+        return False
 
-class Track_Map_Class:
-    def __init__(self, map_: np.array, inflation=0):
-        self.map = map_
-        self.inflation = inflation
-        self.inflated_map = self.inflate_map(inflation)
+    def display(self):
+        plt.imshow(self.grid, cmap='binary', origin='lower')
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        #plt.show()
 
-    def inflate_map(self, inflation):
-        original_map = self.map.copy()
-        inflated_map = self.map.copy()
-        rows, cols, temp = inflated_map.shape
-        for j in range(cols):
-            for i in range(rows):
-                if not original_map[i, j].any():
-                    i_min = max(0, i - inflation)
-                    i_max = min(rows, i + inflation)
-                    j_min = max(0, j - inflation)
-                    j_max = min(cols, j + inflation)
-                    inflated_map[i_min:i_max, j_min:j_max] = 100
-        return inflated_map
+    def print_matrix(self):
+        for row in self.grid:
+            print(" ".join(map(str, row)))
+
+    def _mark_adjacent_obstacles(self, x, y):
+        # Mark left, right, up, down cells as obstacles if they are within bounds
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < self.width and 0 <= ny < self.height:
+                self.grid[ny][nx] = 1
