@@ -29,19 +29,7 @@ class MapWithObstacles:
             self.add_obstacle(6, y)
 
     def create_track2(self):
-        for x in range(self.width):
-            self.add_obstacle(x, 0)
-            self.add_obstacle(x, 19)
-        for y in range(self.height):
-            self.add_obstacle(0, y)
-            self.add_obstacle(19, y)
-
-        for x in range(6, 14):
-            for y in range(6, 14):
-                self.add_obstacle(x, y)
-
-        for y in range(6):
-            self.add_obstacle(6, y)
+        # new track
 
 
     def is_obstacle(self, x, y):
