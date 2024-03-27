@@ -35,7 +35,7 @@ class Odom(object):
         return [waypoints_x, waypoints_y, waypoints_theta]
 
 class Vertex:
-    def __init__(self, x, y, theta, delta, v, cost, parent_index, ver_index, edge_way_points=None, scatter_temp=None):
+    def __init__(self, x, y, theta=0, delta=0, v=0, cost=0, parent_index=0, ver_index=0, edge_way_points=None, scatter_temp=None):
         self.x = x
         self.y = y
         self.theta = theta
@@ -139,19 +139,6 @@ class Graph:
                 return False
         return True
 
-    # draws the path in red
-    def get_path_to_goal(self):
-        if self.success:
-            self.path = []
-            vertex = self.vertexes[-1]
-            self.path.append((vertex[0], vertex[1]))
-            parent_index = vertex[2]
-            while parent_index != 0:
-                vertex = self.vertexes[parent_index]
-                self.path.append((vertex[0], vertex[1]))
-                parent_index = vertex[2]
-        return self.path
-
     # get k nearest vertexes to the given vertex
     def get_k_nearest(self, vertex):
         k = 2
@@ -183,7 +170,7 @@ class Graph:
                     new_vertex.edge_way_points = (path_x, path_y)
                     print("########did wiring thing########")
                     new_vertex.scatter_temp.remove()
-                    new_vertex.scatter_temp = draw_edge2(path_x, path_y)
+                    new_vertex.scatter_temp = self.draw_edge(path_x, path_y)
         return
 
     # loop for k nearest vertexes, for each one ask if the new vertex improves the path to existing vertex from start point
@@ -200,7 +187,7 @@ class Graph:
                     current_vertex.edge_way_points = (path_x, path_y)
                     print("^^^^^^^^ did RE-wiring thing ^^^^^^^^")
                     current_vertex.scatter_temp.remove()
-                    current_vertex.scatter_temp = draw_edge2(path_x, path_y)
+                    current_vertex.scatter_temp = self.draw_edge(path_x, path_y)
         return
 
     def draw_winning_path(self, start, new_vertex):
@@ -211,11 +198,11 @@ class Graph:
             cur_vertex = self.vertexes[cur_vertex.parent_index]
         return
 
-def draw_edge2(waypointX, waypointY, i=0):
-    # plot new edge between vertexes
-    temp = plt.scatter(waypointX, waypointY, marker='o', edgecolors='red', s=0.1)
-    plt.pause(0.05)
-    return temp
+    def draw_edge(self, waypointX, waypointY, i=0):
+        # plot new edge between vertexes
+        temp = plt.scatter(waypointX, waypointY, marker='o', edgecolors='red', s=0.1)
+        plt.pause(0.05)
+        return temp
 
 
 def main():
@@ -231,8 +218,8 @@ def main():
     # initialize and display graph items
     odom = Odom()
     max_delta_per_v = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-    start = Vertex(start[0], start[1], 0, 0, 0, 0, 0, 0)
-    end = Vertex(end[0], end[1], 0, 0, 0, 0, 0, 0)
+    start = Vertex(start[0], start[1])
+    end = Vertex(end[0], end[1])
     graph = Graph(start, end, 0, 1, 1, max_delta_per_v, 10, 0.5)
     vertex = start
 
@@ -262,7 +249,7 @@ def main():
         # create next new vertex and draw it's edge
         new_vertex = Vertex(waypoints[0][-1], waypoints[1][-1], waypoints[2][-1], steering, velocity,
                             time + vertex.cost, vertex.ver_index, graph.get_num_of_vertexes() + 1, waypoints)
-        new_vertex.scatter_temp = draw_edge2(new_vertex.edge_way_points[0], new_vertex.edge_way_points[1], i)
+        new_vertex.scatter_temp = graph.draw_edge(new_vertex.edge_way_points[0], new_vertex.edge_way_points[1], i)
         
         # wiring operation
         graph.wiring(new_vertex, map_with_obstacles)
@@ -275,7 +262,6 @@ def main():
             graph.success = True
             print("---------------------------------------------HAYDEH------------------------------------------")
             graph.draw_winning_path(start, new_vertex)
-            continue
 
         # add new vertex to graph
         graph.add_vertex(new_vertex)
