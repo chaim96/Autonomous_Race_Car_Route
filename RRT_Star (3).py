@@ -225,21 +225,19 @@ def main():
     fig = plt.figure()
 
     # initialize and display map
-    map_with_obstacles = Track_Map.create_map()
+    map_with_obstacles, start, end = Track_Map.create_map()
     map_with_obstacles.display()
 
     # initialize and display graph items
     odom = Odom()
     max_delta_per_v = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-    start = Vertex(1, 1, 0, 0, 0, 0, 0, 0)
-    plt.annotate("start", (start.x, start.y))
-    end = Vertex(8, 3, 0, 0, 0, 0, 0, 0)
-    plt.annotate("end", (end.x, end.y))
-    graph = Graph(start, end, 0, 1, 1, max_delta_per_v, 10, 0)
+    start = Vertex(start[0], start[1], 0, 0, 0, 0, 0, 0)
+    end = Vertex(end[0], end[1], 0, 0, 0, 0, 0, 0)
+    graph = Graph(start, end, 0, 1, 1, max_delta_per_v, 10, 0.5)
     vertex = start
 
     # main loop for expansion
-    iterations = 100
+    iterations = 300
     for i in range(0, iterations):
 
         # calculate next reachable vertex
