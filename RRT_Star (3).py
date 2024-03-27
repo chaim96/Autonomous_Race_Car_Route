@@ -14,7 +14,6 @@ class Odom(object):
     def random_control(self, vertex, velocity, steering, time):
         theta_dot = velocity * np.tan(steering) / self.wheelbase
         dt = 0.03
-        # print(theta_dot * time)
         waypoints_x = []
         waypoints_y = []
         waypoints_theta = []
@@ -33,9 +32,6 @@ class Odom(object):
             waypoints_x.append(self.x)
             waypoints_y.append(self.y)
             waypoints_theta.append(self.theta)
-        # self.x = waypoints_x[-1]
-        # self.y = waypoints_y[-1]
-        # self.theta = waypoints_theta[-1]
         return [waypoints_x, waypoints_y, waypoints_theta]
 
 class Vertex:
@@ -48,7 +44,7 @@ class Vertex:
         self.cost = cost
         self.parent_index = parent_index
         self.ver_index = ver_index
-        self.edge_way_points = edge_way_points #this is the edge that connect vertex to start point
+        self.edge_way_points = edge_way_points
         self.scatter_temp = scatter_temp
 
 class Graph:
@@ -80,22 +76,9 @@ class Graph:
 
     # chooses random delta, v, t and return them
     def choose_random_parameters(self, vertex):
-        valid_delta_for_v = False
-        while not valid_delta_for_v:
-            v = random.randint(max(1, vertex.v - self.v_change_range), vertex.v + self.v_change_range)
-            # check if the lower limit of the random delta range is smaller\equal to the max delta allowed by v
-            # if not, choose a new v
-            if (vertex.delta - self.delta_change_range) <= self.max_delta_per_v[v]:
-                valid_delta_for_v = True
-                # check if the higher limit of the random delta range is smaller\equal to the max delta allowed by v
-                if (vertex.delta + self.delta_change_range) <= self.max_delta_per_v[v]:
-                    delta = random.uniform(vertex.delta - self.delta_change_range,
-                                           vertex.delta + self.delta_change_range)
-                # if not, make the max delta the higher limit of the range
-                else:
-                    #delta = random.uniform(vertex.delta - self.delta_change_range, self.max_delta_per_v[v])
-                    delta = random.uniform(vertex.delta - self.delta_change_range, 0.01)
-
+        v = random.randint(max(1, vertex.v - self.v_change_range), vertex.v + self.v_change_range)
+        delta_options_list = [0.1, -0.1, 0.2, -0.2, 0.3, -0.3]
+        delta = random.choice(delta_options_list)
         t = random.randint(5, self.t_max)
         return delta, v, t
 
@@ -140,8 +123,6 @@ class Graph:
 
     # calculates cost of target if its parent is source
     def calc_cost(self, source_vertex, terget_vertex):
-        # new_cost = source_cost + delta time between them
-        #self.calc_cost(current_vertex, new_vertex)
         path_x, path_y, path_yaw, mode, lengths = plan_dubins_path(source_vertex.x, source_vertex.y, source_vertex.theta, terget_vertex.x, terget_vertex.y, terget_vertex.theta, 1.0)
         v = source_vertex.v
         x = sum(lengths)
@@ -195,12 +176,10 @@ class Graph:
             # if new vertex is reachable from current vertex -> check if new vertex cost is better
             path_x, path_y, new_cost = self.calc_cost(current_vertex, new_vertex);
             if self.is_reachable(path_x, path_y, map_with_obstacles):
-                #print("-------new_cost: " + str(new_cost))
-                #print("-------current_cost: " + str(new_vertex.cost))
                 if new_cost < new_vertex.cost:
                     # current vertex will be the parent of new vertex in the tree
                     new_vertex.cost = new_cost
-                    new_vertex.parent_index = index
+                    new_vertex.parent_index = k_nearest[index].ver_index
                     new_vertex.edge_way_points = (path_x, path_y)
                     print("########did wiring thing########")
                     new_vertex.scatter_temp.remove()
@@ -225,7 +204,6 @@ class Graph:
         return
 
     def draw_winning_path(self, start, new_vertex):
-        #import pdb;pdb.set_trace()
         cur_vertex = new_vertex
         while(cur_vertex is not start):
             print("x: " + str(cur_vertex.x) + "y: " +str(cur_vertex.y))
@@ -236,26 +214,21 @@ class Graph:
 def draw_edge2(waypointX, waypointY, i=0):
     # plot new edge between vertexes
     temp = plt.scatter(waypointX, waypointY, marker='o', edgecolors='red', s=1)
-    #ax.annotate(str(i + 1), (waypointX[-1], waypointY[-1]))
     plt.pause(0.05)
-    #import pdb;pdb.set_trace()
     return temp
 
 
-def gui():
+def main():
 
-    # initialize objects and main variables
+    # initialize plot items
     plt.ion()
     plt.figure()
 
-#
-    map_with_obstacles = Track_Map.MapWithObstacles(10, 10)  # Create a 10x10 map
-    map_with_obstacles.add_obstacle(3, 3)  # Add an obstacle at position (3, 3)
-    map_with_obstacles.add_obstacle(2, 0)  # Add an obstacle at position (3, 3)
-    map_with_obstacles.add_obstacle(-1, 0)  # Add an obstacle at position (3, 3)
-    map_with_obstacles.display()  # Display the map with obstacles
+    # initialize and display map
+    map_with_obstacles = Track_Map.create_map()
+    map_with_obstacles.display()
 
-
+    # initialize and display graph items
     odom = Odom()
     max_delta_per_v = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
     start = Vertex(0, 0, 0, 0, 0, 0, 0, 0)
@@ -263,47 +236,42 @@ def gui():
     end = Vertex(5, 5, 0, 0, 0, 0, 0, 0)
     plt.annotate("end", (end.x, end.y))
     graph = Graph(start, end, 0, 1, 1, max_delta_per_v, 10, 0.5)
-    iterations = 10
     vertex = Vertex(odom.x, odom.y, odom.theta, 0, 0, 0, 0, 0)
 
     # main loop for expansion
+    iterations = 100
     for i in range(0, iterations):
 
-        # calculate new vertex from parameters and show it and its edge
-        colide = True
-        while colide:
+        # calculate next reachable vertex
+        collide = True
+        while collide:
             # get parameters: random steering, velocity and time
             steering, velocity, time = graph.choose_random_parameters(vertex)
-            delta_options_list = [0.1, -0.1, 0.2, -0.2, 0.3, -0.3]
-            steering = random.choice(delta_options_list)
-            print(
-                f'iteration {i + 1}, velocity {velocity}, steering {steering * 180 / math.pi}, time {time}, start vertex {vertex.parent_index + 1}')
-
+            print(f'iteration {i + 1}, velocity {velocity}, steering {steering * 180 / math.pi}, time {time}, start vertex {vertex.parent_index + 1}')
+            # get edge to new vertex
             waypoints = odom.random_control(vertex, velocity, steering, time)  # waypoints = [[Xs],[Ys],[thetas]]
+            # if edge collides with obstacle - create a new one
             if graph.is_reachable(waypoints[0], waypoints[1], map_with_obstacles):
-                colide = False
+                collide = False
             else:
                 print("COLLISION")
 
+        # create next new vertex and draw it's edge
         new_vertex = Vertex(waypoints[0][-1], waypoints[1][-1], waypoints[2][-1], steering, velocity,
                             time + vertex.cost, vertex.ver_index, graph.get_num_of_vertexes() + 1, waypoints)
-        
-        #draw_edge(vertex, new_vertex)
         new_vertex.scatter_temp = draw_edge2(new_vertex.edge_way_points[0], new_vertex.edge_way_points[1], i)
         
         # wiring operation
         graph.wiring(new_vertex, map_with_obstacles)
+
         # rewiring operation
         graph.rewiring(new_vertex, map_with_obstacles)
-
-        #ax.scatter(waypoints[0], waypoints[1],marker='none')
         
         # check if we got to the end vertex
         if graph.is_in_end_radius(new_vertex):
             graph.success = True
             print("---------------------------------------------HAYDEH------------------------------------------")
             graph.draw_winning_path(start, new_vertex)
-            #break
             continue
 
         # add new vertex to graph
@@ -325,7 +293,7 @@ def gui():
 
 
 if __name__ == "__main__":
-    gui()
+    main()
     plt.show()
     print("FINISH")
 

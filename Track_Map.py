@@ -32,3 +32,10 @@ class MapWithObstacles:
             nx, ny = x + dx, y + dy
             if 0 <= nx < self.width and 0 <= ny < self.height:
                 self.grid[ny][nx] = 1
+
+def create_map():
+    map_with_obstacles = MapWithObstacles(10, 10)  # Create a 10x10 map
+    map_with_obstacles.add_obstacle(3, 3)  # Add an obstacle at position (3, 3)
+    map_with_obstacles.add_obstacle(2, 0)
+    map_with_obstacles.add_obstacle(-1, 0)
+    return map_with_obstacles
