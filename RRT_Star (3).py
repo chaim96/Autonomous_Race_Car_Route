@@ -1,8 +1,6 @@
 import math
 import random
-
 import Track_Map
-import numpy as np
 import matplotlib.pyplot as plt
 from dubins_path_planner import *
 
@@ -40,7 +38,6 @@ class Odom(object):
         # self.theta = waypoints_theta[-1]
         return [waypoints_x, waypoints_y, waypoints_theta]
 
-
 class Vertex:
     def __init__(self, x, y, theta, delta, v, cost, parent_index, ver_index, edge_way_points=None, scatter_temp=None):
         self.x = x
@@ -53,7 +50,6 @@ class Vertex:
         self.ver_index = ver_index
         self.edge_way_points = edge_way_points #this is the edge that connect vertex to start point
         self.scatter_temp = scatter_temp
-
 
 class Graph:
     def __init__(self, start, end, obstacles, v_change_range, delta_change_range, max_delta_per_v, t_max, bias_ratio):
@@ -153,14 +149,6 @@ class Graph:
         target_cost = source_vertex.cost + t
         return path_x, path_y, target_cost
 
-        # TODO: ori should give us
-        return 1
-
-    # checks if vertex is within track boundaries
-    def is_in_track(self, x, y):
-        # TODO: add later on, check if new vertex is within track boundaries
-        return True
-
     # checks if it is possible to go from current vertex to target vertex
     def is_reachable(self, path_x, path_y, map_with_obstacles):
         for i in range(0, len(path_x)):
@@ -169,28 +157,6 @@ class Graph:
             if map_with_obstacles.is_obstacle(x, y):
                 return False
         return True
-    """""
-    # creates a new vertex in graph
-    def expand_graph(self):
-        # choose an existing vertex to expand from
-        if random.random(0, 1) <= self.bias_ratio:  # bias expanding
-            parent_of_next_vertex = self.find_nearest_vertex_to_end(self.end)
-        else:  # random expanding
-            parent_of_next_vertex = self.choose_random_existing_vertex()
-        # keep getting a new vertex to expand to, and stop when it's within the track boundaries
-        first_iteration = True
-        while not self.is_in_track(x, y) or first_iteration == True:
-            delta, v, t = self.choose_random_parameters(parent_of_next_vertex)
-            x, y, theta = self.control_command(parent_of_next_vertex, delta, v, t)
-            first_iteration = False
-        # create the new vertex object and add it to the vertexes list
-        next_vertex = Vertex(x, y, theta, delta, v, parent_of_next_vertex.cost + t,
-                             self.vertexes.index(parent_of_next_vertex))
-        self.add_vertex(next_vertex)
-        # check if we got to the end vertex
-        if self.is_in_end_radius(next_vertex):
-            self.success = True
-    """""
 
     # draws the path in red
     def get_path_to_goal(self):
@@ -267,17 +233,6 @@ class Graph:
             cur_vertex = self.vertexes[cur_vertex.parent_index]
         return
 
-def draw_edge(source_vertex, terget_vertex):
-    path_x, path_y, path_yaw, mode, lengths = plan_dubins_path(source_vertex.x, source_vertex.y, source_vertex.theta, terget_vertex.x, terget_vertex.y, terget_vertex.theta, 1.0)
-    plt.plot(path_x, path_y, label="".join(mode))
-    plt.legend()
-    plt.grid(True)
-    plt.axis("equal")
-    plt.pause(0.05)
-
-def remove_edge(temp):
-    temp.remove()
-
 def draw_edge2(waypointX, waypointY, i=0):
     # plot new edge between vertexes
     temp = plt.scatter(waypointX, waypointY, marker='o', edgecolors='red', s=1)
@@ -287,17 +242,17 @@ def draw_edge2(waypointX, waypointY, i=0):
     return temp
 
 
-
 def gui():
+
     # initialize objects and main variables
-#    race_track_map = np.array(np.load('smaller_circle.npy'), dtype=int)
-#    race_track = Map_Class.Map(race_track_map, 1)
     plt.ion()
-    fig = plt.figure()
-    #ax = fig.add_subplot()
+    plt.figure()
+
 
     map_with_obstacles = Track_Map.MapWithObstacles(10, 10)  # Create a 10x10 map
     map_with_obstacles.add_obstacle(3, 3)  # Add an obstacle at position (3, 3)
+    map_with_obstacles.add_obstacle(2, 0)  # Add an obstacle at position (3, 3)
+    map_with_obstacles.add_obstacle(-1, 0)  # Add an obstacle at position (3, 3)
     map_with_obstacles.display()  # Display the map with obstacles
 
 
@@ -305,23 +260,31 @@ def gui():
     max_delta_per_v = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
     start = Vertex(0, 0, 0, 0, 0, 0, 0, 0)
     plt.annotate("start", (start.x, start.y))
-    end = Vertex(1, 1, 0, 0, 0, 0, 0, 0)
+    end = Vertex(5, 5, 0, 0, 0, 0, 0, 0)
     plt.annotate("end", (end.x, end.y))
     graph = Graph(start, end, 0, 1, 1, max_delta_per_v, 10, 0.5)
-    iterations = 100
+    iterations = 10
     vertex = Vertex(odom.x, odom.y, odom.theta, 0, 0, 0, 0, 0)
 
     # main loop for expansion
     for i in range(0, iterations):
 
-        # get parameters: random steering, velocity and time
-        steering, velocity, time = graph.choose_random_parameters(vertex)
-        delta_options_list = [0.1, -0.1, 0.2, -0.2, 0.3, -0.3]
-        steering = random.choice(delta_options_list)
-        print(f'iteration {i + 1}, velocity {velocity}, steering {steering * 180 / math.pi}, time {time}, start vertex {vertex.parent_index+1}')
-
         # calculate new vertex from parameters and show it and its edge
-        waypoints = odom.random_control(vertex, velocity, steering, time) #waypoints = [[Xs],[Ys],[thetas]]
+        colide = True
+        while colide:
+            # get parameters: random steering, velocity and time
+            steering, velocity, time = graph.choose_random_parameters(vertex)
+            delta_options_list = [0.1, -0.1, 0.2, -0.2, 0.3, -0.3]
+            steering = random.choice(delta_options_list)
+            print(
+                f'iteration {i + 1}, velocity {velocity}, steering {steering * 180 / math.pi}, time {time}, start vertex {vertex.parent_index + 1}')
+
+            waypoints = odom.random_control(vertex, velocity, steering, time)  # waypoints = [[Xs],[Ys],[thetas]]
+            if graph.is_reachable(waypoints[0], waypoints[1], map_with_obstacles):
+                colide = False
+            else:
+                print("COLLISION")
+
         new_vertex = Vertex(waypoints[0][-1], waypoints[1][-1], waypoints[2][-1], steering, velocity,
                             time + vertex.cost, vertex.ver_index, graph.get_num_of_vertexes() + 1, waypoints)
         
@@ -354,6 +317,8 @@ def gui():
             vertex = graph.choose_random_existing_vertex()
             print("next is random:")
 
+        plt.show()
+
     plt.draw()
     plt.pause(0.02)
     plt.show()
@@ -361,10 +326,10 @@ def gui():
 
 if __name__ == "__main__":
     gui()
+    plt.show()
     print("FINISH")
 
-# TODO: where wiring and rewiring should be called from?
-# I think from expand_graph function
+
 '''
         # Algorithm:
         1. choose random vertex to be the parent.

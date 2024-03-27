@@ -9,7 +9,7 @@ class MapWithObstacles:
     def add_obstacle(self, x, y):
         if 0 <= x < self.width and 0 <= y < self.height:
             self.grid[y][x] = 1  # Set obstacle at position (x, y)
-            self._mark_adjacent_obstacles(x, y)
+            #self._mark_adjacent_obstacles(x, y)
 
     def is_obstacle(self, x, y):
         if 0 <= x < self.width and 0 <= y < self.height:
