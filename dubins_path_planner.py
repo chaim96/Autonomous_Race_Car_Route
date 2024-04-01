@@ -276,7 +276,7 @@ def main():
     end_y = -3.0  # [m]
     end_yaw = np.deg2rad(-45.0)  # [rad]
 
-    curvature = 1.0
+    curvature = 5.0
 
     path_x, path_y, path_yaw, mode, lengths = plan_dubins_path(start_x,
                                                                start_y,
