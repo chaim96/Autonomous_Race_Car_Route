@@ -51,6 +51,27 @@ class MapWithObstacles:
         self.add_obstacle(2, 6, True)
         self.add_obstacle(15, 9, True)
         self.add_obstacle(11, 3, True)
+        self.add_obstacle(7, 12, True)
+        self.add_obstacle(10, 16, True)
+        return start, end
+
+
+    def create_track3(self):
+        start = (1, 1)
+        end = (16, 16)
+        plt.annotate("start", (start[0], start[1]))
+        plt.annotate("end", (end[0], end[1]))
+        for x in range(self.width):
+            self.add_obstacle(x, 0)
+            self.add_obstacle(x, 19)
+        for y in range(self.height):
+            self.add_obstacle(0, y)
+            self.add_obstacle(19, y)
+        for x in range(1, 15):
+            self.add_obstacle(x, 5, False)
+        for x in range(5, 20):
+            self.add_obstacle(x, 12, False)
+
         return start, end
 
 
@@ -78,7 +99,7 @@ class MapWithObstacles:
 
 def create_map():
     map_with_obstacles = MapWithObstacles(20, 20)  # Create a 10x10 map
-    start, end = map_with_obstacles.create_track2()
+    start, end = map_with_obstacles.create_track3()
     return map_with_obstacles, start, end
 
 

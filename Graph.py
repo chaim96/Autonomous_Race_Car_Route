@@ -5,13 +5,14 @@ import matplotlib.pyplot as plt
 from dubins_path_planner import *
 
 
-def random_control(closest_x, closest_y, closest_theta, random_x, random_y, velocity):
+def random_control(closest_x, closest_y, closest_theta, random_x, random_y):
     wheelbase = 0.35
     alpha = math.atan2(random_y - closest_y, random_x - closest_x) - closest_theta
     lf = max((((random_x - closest_x) ** 2 + (random_y - closest_y) ** 2) ** 0.5), 0.01)
     steering = math.atan2(2.0 * wheelbase * math.sin(alpha) / lf, 1.0)
+    velocity = set_velocity(alpha, steering)
     theta_dot = velocity * np.tan(steering) / wheelbase
-    dt = 0.13
+    dt = 0.03
     waypoints_x = []
     waypoints_y = []
     waypoints_theta = []
@@ -20,10 +21,7 @@ def random_control(closest_x, closest_y, closest_theta, random_x, random_y, velo
     waypoints_theta.append(closest_theta)
     reach_goal = False
     total_time = 0
-    i = 0
     while not reach_goal:
-        i = i + 1
-        # print(i)
         total_time += dt
         closest_theta += theta_dot * dt
         x_dot = velocity * np.cos(closest_theta)
@@ -38,13 +36,13 @@ def random_control(closest_x, closest_y, closest_theta, random_x, random_y, velo
     waypoints_x.append(random_x)
     waypoints_y.append(random_y)
     waypoints_theta.append(closest_theta)
-    return [waypoints_x, waypoints_y, waypoints_theta], total_time
+    return [waypoints_x, waypoints_y, waypoints_theta], total_time, steering, velocity
 
 
-def set_velocity(alfa, steering):
+def set_velocity(alpha, steering):
     v_max = 3
     v_min = 0.5
-    v = (-1) * alfa * steering + 2
+    v = (-1) * alpha * steering + 2
     if v > v_max:
         v = v_max
     if v < v_min:
@@ -68,7 +66,7 @@ class Vertex:
 
 
 class Graph:
-    def __init__(self, start, end, v_change_range, delta_change_range, max_delta_per_v, bias_ratio):
+    def __init__(self, start, end, bias_ratio):
         # graph attributes
         self.start = start
         self.end = end
@@ -76,9 +74,6 @@ class Graph:
         self.vertexes = [start]  # start that is passed as an argument must be a Vertex class object
         self.path = []
         self.end_radius = 2
-        self.v_change_range = v_change_range  # a new v will be within [v_current - v_change_range, v_current + v_change_range]
-        self.delta_change_range = delta_change_range  # a new delta will be within [delta_current - delta_change_range, delta_current + delta_change_range]
-        self.max_delta_per_v = max_delta_per_v  # an array which contains the max delta possible for a given v
         self.bias_ratio = bias_ratio  # sets how often we expand by bias
         self.end_vertexes = []
         self.optimum_vertex = None
@@ -120,8 +115,8 @@ class Graph:
 
     # calculates cost of target if its parent is source
     def calc_cost(self, source_vertex, target_vertex):
-        waypoints, time = random_control(source_vertex.x, source_vertex.y, source_vertex.theta, target_vertex.x,
-                                         target_vertex.y, source_vertex.v)
+        waypoints, time, steering, velocity = random_control(source_vertex.x, source_vertex.y, source_vertex.theta, target_vertex.x,
+                                         target_vertex.y)
         target_cost = source_vertex.cost + time
         return waypoints[0], waypoints[1], target_cost
 
@@ -163,15 +158,15 @@ class Graph:
     def find_first_vertex_with_valid_edge_from_K_vertexes(self, random_x, random_y, map_with_obstacles):
         k_nearest_vertexes = self.get_k_nearest(random_x, random_y)
         for vertex in k_nearest_vertexes:
-            waypoints, time = random_control(vertex.x, vertex.y, vertex.theta, random_x, random_y, vertex.v)
+            waypoints, time, steering, velocity = random_control(vertex.x, vertex.y, vertex.theta, random_x, random_y)
             if self.is_reachable(waypoints[0], waypoints[1],
                                  map_with_obstacles) and self.calc_distance_between_vertexes(vertex,
                                                                                              self.end) > self.end_radius:
-                return True, vertex, waypoints, time
-        return False, 0, 0, 0
+                return True, vertex, waypoints, time, steering, velocity
+        return False, 0, 0, 0, 0, 0
 
-    def create_new_vertex(self, vertex, waypoints, time):
-        new_vertex = Vertex(waypoints[0][-1], waypoints[1][-1], waypoints[2][-1], waypoints[2][-1], vertex.v,
+    def create_new_vertex(self, vertex, waypoints, time, steering, velocity):
+        new_vertex = Vertex(waypoints[0][-1], waypoints[1][-1], waypoints[2][-1], steering, velocity,
                             time + vertex.cost, vertex.ver_index, self.get_num_of_vertexes(), waypoints)
         new_vertex.scatter_temp = self.draw_edge(new_vertex.edge_way_points[0], new_vertex.edge_way_points[1])
         return new_vertex
@@ -214,8 +209,7 @@ class Graph:
         cur_vertex = new_vertex
         while (cur_vertex is not start):
             print("x: " + str(cur_vertex.x) + "y: " + str(cur_vertex.y))
-            plt.scatter(cur_vertex.edge_way_points[0], cur_vertex.edge_way_points[1], marker='o', edgecolors='green',
-                        s=10)
+            plt.scatter(cur_vertex.edge_way_points[0], cur_vertex.edge_way_points[1], marker='o', edgecolors='green', s=10)
             cur_vertex = self.vertexes[cur_vertex.parent_index]
         return
 
@@ -224,6 +218,19 @@ class Graph:
         temp = plt.scatter(waypointX, waypointY, marker='o', edgecolors='red', s=0.1)
         plt.pause(0.05)
         return temp
+
+    def get_next_guiding_point(self, map_with_obstacles):
+        x = 0
+        y = 0
+        if random.random() <= self.bias_ratio:
+            x = self.end.x
+            y = self.end.y
+            print("next is bias:")
+        else:
+            x, y = self.get_random_point(map_with_obstacles)
+            print("next is random:")
+        return x, y
+
 
 
 def main():
@@ -236,10 +243,9 @@ def main():
     map_with_obstacles.display()
 
     # initialize and display graph items
-    max_delta_per_v = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
     start = Vertex(start[0], start[1])
     end = Vertex(end[0], end[1])
-    graph = Graph(start, end, 1, 1, max_delta_per_v, 0.05)
+    graph = Graph(start, end, 0.05)
 
     # main loop for expansion
     iterations = 300
@@ -251,21 +257,14 @@ def main():
         while collide:
 
             # get next guiding point in map - random or end (bias)
-            if random.random() <= graph.bias_ratio:
-                x = graph.end.x
-                y = graph.end.y
-                print("next is bias:")
-            else:
-                x, y = graph.get_random_point(map_with_obstacles)
-                print("next is random:")
+            x, y = graph.get_next_guiding_point(map_with_obstacles)
 
             # find first valid edge from one of the K nearest vertexes, and draw it
-            result, vertex, waypoints, time = graph.find_first_vertex_with_valid_edge_from_K_vertexes(x, y,
-                                                                                                      map_with_obstacles)
+            result, vertex, waypoints, time, steering, velocity = graph.find_first_vertex_with_valid_edge_from_K_vertexes(x, y, map_with_obstacles)
             collide = not result
 
         # create new vertex from random point
-        new_vertex = graph.create_new_vertex(vertex, waypoints, time)
+        new_vertex = graph.create_new_vertex(vertex, waypoints, time, steering, velocity)
 
         # wiring & rewiring
         graph.wiring(new_vertex, map_with_obstacles)
@@ -287,14 +286,3 @@ def main():
 if __name__ == "__main__":
     main()
     print("FINISH")
-
-'''
-        # Algorithm:
-        1. choose random vertex to be the parent.
-        2. choose random delta, v, t.
-        3. calculate new vertex (using the control command that ori will give us).
-        4. wiring - loop for all existing vertexes and find the fastest path to new vertex from start point
-            (at the end of this step we should have the new vertex and the path from start point to it in the tree)
-        5. rewire - loop for all existing vertexes and for each existing vertex we will ask if the new vertex improves
-            the path to existing vertex from start point
-'''
